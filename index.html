@@ -28,9 +28,9 @@
       var(--bg);
   }
   .wrap {
-    max-width: 1400px;
+    max-width: 1320px;
     margin: 0 auto;
-    padding: 28px 20px 36px;
+    padding: 40px 40px 56px;
   }
   .hero {
     display: flex;
@@ -72,7 +72,7 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     padding: 18px;
-    margin-bottom: 18px;
+    margin-bottom: 28px;
   }
   .section-title {
     font-size: 16px;
@@ -152,7 +152,7 @@
   .workspace {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 18px;
+    gap: 30px;
   }
   .editor-card {
     display: flex;
@@ -256,12 +256,12 @@
 </head>
 <body>
   <div class="wrap">
+    <div class="hero">
       <div>
         <h1 class="title">Bubblecut</h1>
         <p class="subtitle">작가용 말풍선 텍스트 정리 도구. 번호 삭제, 조건 필터링, 문장부호 우선 분리, 최대 줄 수 기준 말풍선 분리를 한 번에 처리합니다.</p>
       </div>
-
-    </div>
+          </div>
 
     <div class="panel">
       <h2 class="section-title">설정</h2>
@@ -284,7 +284,7 @@
         <div class="row">
           <div class="field">
             말풍선 최대 줄 수
-            <input type="number" id="maxLines" value="3" min="1" max="10" onchange="renderLineRules()">
+            <input type="number" id="maxLines" value="4" min="1" max="10" onchange="resetLineRulesToDefault()">
             줄
           </div>
           <label class="chip"><input type="checkbox" id="preferPunctuation" checked> 문장부호 우선 분리</label>
@@ -379,17 +379,16 @@ function renderLineRules() {
   document.getElementById("maxLines").value = maxLines;
 
   const wrap = document.getElementById("lineRules");
-  const oldValues = getLineRules();
   const defaults = buildDefaultRules(maxLines);
   wrap.innerHTML = "";
 
   for (let i = 1; i <= maxLines; i++) {
-    const saved = oldValues[i - 1] || defaults[i - 1];
+    const saved = defaults[i - 1];
     const card = document.createElement("div");
     card.className = "line-rule";
     card.innerHTML = `
       <div class="line-rule-title">${i}번째 줄</div>
-      <div class="row">
+      <div class="inner">
         <span>어절</span>
         <input type="number" class="line-min" min="1" max="20" value="${saved.min}">
         <span>~</span>
