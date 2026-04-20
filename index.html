@@ -13,7 +13,7 @@
     color: #222;
   }
   .wrap {
-    max-width: 1240px;
+    max-width: 1320px;
     margin: 0 auto;
     padding: 24px;
   }
@@ -64,18 +64,18 @@
     border-radius: 10px;
     font-size: 14px;
   }
-  .controls input[type="number"] { width: 64px; }
+  .controls input[type="number"] { width: 72px; }
   .controls input[type="text"] { min-width: 260px; }
   .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 18px;
   }
-  @media (max-width: 900px) {
+  @media (max-width: 980px) {
     .grid { grid-template-columns: 1fr; }
     .controls input[type="text"] { min-width: 180px; width: 100%; }
   }
-  h2 {
+  h2, h3 {
     margin: 0 0 10px;
     font-size: 18px;
   }
@@ -119,12 +119,37 @@
     font-size: 13px;
     color: #666;
   }
+  .line-rules {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .line-rule {
+    border: 1px solid #e3e7f0;
+    border-radius: 14px;
+    padding: 12px;
+    background: #fafbff;
+  }
+  .line-rule-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .line-rule .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .line-rule input[type="number"] {
+    width: 64px;
+  }
 </style>
 </head>
 <body>
   <div class="wrap">
     <h1>말풍선 텍스트 정리기</h1>
-    <p class="sub">줄 앞 번호 삭제, 조건에 맞는 줄만 남기기, 기존 줄바꿈마다 빈 줄 추가, 긴 문장을 3~4어절 단위로 나누는 도구입니다.</p>
+    <p class="sub">줄 앞 번호 삭제, 조건에 맞는 줄만 남기기, 기존 줄바꿈마다 빈 줄 추가, 긴 문장을 줄 번호별 어절 범위에 따라 나누는 도구입니다.</p>
 
     <div class="panel">
       <div class="controls">
@@ -146,15 +171,20 @@
         </div>
 
         <div class="control-row">
-          <div class="range-box">
-            <span>어절 범위</span>
-            <input type="number" id="minWords" value="3" min="1" max="10">
-            <span>~</span>
-            <input type="number" id="maxWords" value="4" min="1" max="10">
-          </div>
+          <label>말풍선 안 텍스트:
+            <input type="number" id="maxLines" value="3" min="1" max="10" onchange="renderLineRules()">
+            줄
+          </label>
+          <span class="small">각 줄마다 최소~최대 어절 범위를 따로 지정할 수 있습니다.</span>
+        </div>
+
+        <div>
+          <h3>줄별 어절 범위</h3>
+          <div id="lineRules" class="line-rules"></div>
+          <div class="hint">예: 1줄 1~2어절 / 2줄 3~4어절 / 3줄 1~2어절처럼 설정 가능</div>
         </div>
       </div>
-      <div class="hint">필터는 함께 사용할 수도 있습니다. 둘 다 켜면 조건을 둘 다 만족하는 줄만 남습니다.</div>
+      <div class="hint">필터는 함께 사용할 수 있습니다. 줄 분리를 켜면, 아래의 줄별 규칙을 우선 사용합니다.</div>
     </div>
 
     <div class="grid">
@@ -184,6 +214,19 @@ const BREAK_HINT_WORDS = new Set([
   "마음에","믿어지지","내가","아","울고있는"
 ]);
 
+const DEFAULT_RULES = [
+  { min: 1, max: 2 },
+  { min: 3, max: 4 },
+  { min: 1, max: 2 },
+  { min: 2, max: 3 },
+  { min: 2, max: 3 },
+  { min: 2, max: 3 },
+  { min: 2, max: 3 },
+  { min: 2, max: 3 },
+  { min: 2, max: 3 },
+  { min: 2, max: 3 }
+];
+
 function removeLeadingNumber(line) {
   return line.replace(/^\s*\d+\.\s*/, "");
 }
@@ -197,40 +240,99 @@ function startsWithPrefix(line, prefix) {
   return line.trimStart().startsWith(prefix);
 }
 
-function splitLongLine(line, minWords, maxWords) {
-  const trimmed = line.trim();
-  if (!trimmed) return [""];
-  const words = trimmed.split(/\s+/).filter(Boolean);
+function renderLineRules() {
+  let maxLines = parseInt(document.getElementById("maxLines").value, 10);
+  if (isNaN(maxLines) || maxLines < 1) maxLines = 3;
+  if (maxLines > 10) maxLines = 10;
+  document.getElementById("maxLines").value = maxLines;
 
-  if (words.length <= maxWords) return [trimmed];
+  const wrap = document.getElementById("lineRules");
+  const oldValues = getLineRules();
+  wrap.innerHTML = "";
 
-  const out = [];
-  let current = [];
+  for (let i = 1; i <= maxLines; i++) {
+    const fallback = DEFAULT_RULES[i - 1] || { min: 2, max: 3 };
+    const saved = oldValues[i - 1] || fallback;
 
-  for (let i = 0; i < words.length; i++) {
-    current.push(words[i]);
+    const card = document.createElement("div");
+    card.className = "line-rule";
+    card.innerHTML = `
+      <div class="line-rule-title">${i}번째 줄</div>
+      <div class="row">
+        <span>어절</span>
+        <input type="number" class="line-min" min="1" max="20" value="${saved.min}">
+        <span>~</span>
+        <input type="number" class="line-max" min="1" max="20" value="${saved.max}">
+      </div>
+    `;
+    wrap.appendChild(card);
+  }
+}
 
-    const word = words[i];
-    const nextWord = words[i + 1] || "";
-    const count = current.length;
-    const isLast = i === words.length - 1;
+function getLineRules() {
+  const mins = Array.from(document.querySelectorAll(".line-min"));
+  const maxs = Array.from(document.querySelectorAll(".line-max"));
+  const rules = [];
 
+  for (let i = 0; i < Math.min(mins.length, maxs.length); i++) {
+    let min = parseInt(mins[i].value, 10);
+    let max = parseInt(maxs[i].value, 10);
+    if (isNaN(min) || min < 1) min = 1;
+    if (isNaN(max) || max < 1) max = min;
+    if (min > max) [min, max] = [max, min];
+    rules.push({ min, max });
+  }
+
+  return rules;
+}
+
+function chooseBreakLength(words, startIndex, minWords, maxWords) {
+  const remaining = words.length - startIndex;
+  if (remaining <= maxWords) return remaining;
+
+  let bestLen = maxWords;
+
+  for (let len = minWords; len <= maxWords; len++) {
+    const idx = startIndex + len - 1;
+    const word = words[idx] || "";
+    const nextWord = words[idx + 1] || "";
     const endsSentence = /[.!?…』」”"]$/.test(word);
     const nextStartsBeat = BREAK_HINT_WORDS.has(nextWord);
 
-    if (isLast) {
-      out.push(current.join(" "));
-      current = [];
-      continue;
-    }
-
-    if ((count >= minWords && endsSentence) || (count >= minWords && nextStartsBeat) || count >= maxWords) {
-      out.push(current.join(" "));
-      current = [];
+    if (endsSentence || nextStartsBeat) {
+      bestLen = len;
+      break;
     }
   }
 
-  if (current.length) out.push(current.join(" "));
+  return bestLen;
+}
+
+function splitByLineRules(line, rules) {
+  const trimmed = line.trim();
+  if (!trimmed) return [""];
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+
+  const out = [];
+  let index = 0;
+
+  for (let lineIndex = 0; lineIndex < rules.length && index < words.length; lineIndex++) {
+    const rule = rules[lineIndex] || { min: 2, max: 3 };
+    const len = chooseBreakLength(words, index, rule.min, rule.max);
+    out.push(words.slice(index, index + len).join(" "));
+    index += len;
+  }
+
+  if (index < words.length) {
+    if (out.length) {
+      out[out.length - 1] += " " + words.slice(index).join(" ");
+    } else {
+      out.push(words.slice(index).join(" "));
+    }
+  }
+
   return out;
 }
 
@@ -242,17 +344,7 @@ function processText() {
   const keepQuotedOnly = document.getElementById("keepQuotedOnly").checked;
   const keepPrefixOnly = document.getElementById("keepPrefixOnly").checked;
   const prefixText = document.getElementById("prefixText").value;
-
-  let minWords = parseInt(document.getElementById("minWords").value, 10);
-  let maxWords = parseInt(document.getElementById("maxWords").value, 10);
-
-  if (isNaN(minWords) || minWords < 1) minWords = 3;
-  if (isNaN(maxWords) || maxWords < 1) maxWords = 4;
-  if (minWords > maxWords) {
-    const temp = minWords;
-    minWords = maxWords;
-    maxWords = temp;
-  }
+  const lineRules = getLineRules();
 
   const lines = input.split("\n");
   const keptLines = [];
@@ -285,7 +377,7 @@ function processText() {
 
   keptLines.forEach((line, index) => {
     if (splitLines && line.trim() !== "") {
-      result.push(...splitLongLine(line, minWords, maxWords));
+      result.push(...splitByLineRules(line, lineRules));
     } else {
       result.push(line);
     }
@@ -316,6 +408,8 @@ function clearInput() {
   document.getElementById("input").value = "";
   document.getElementById("output").value = "";
 }
+
+renderLineRules();
 </script>
 </body>
 </html>
